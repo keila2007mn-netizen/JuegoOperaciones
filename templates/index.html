@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juego de Operaciones Básicas</title>
+  <style>
+    :root {
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --accent-2: #60a5fa;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      /* Fondo de imagen */
+      background: url("{{ url_for('static', filename='img/fondo.jpg') }}") no-repeat center center fixed;
+      background-size: cover;
+    }
+    .wrap {
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: rgba(0,0,0,0.6);
+      border-radius: 10px;
+    }
+    header h1 { text-align: center; }
+    .setup, .game, .end { margin-top: 20px; }
+    input[type="number"] { width: 80px; }
+    button { padding: 8px 12px; margin-left: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Juego de Operaciones Básicas</h1>
+    </header>
+
+    <!-- Configuración -->
+    <section class="setup" id="setup">
+      <label for="modo">Operación:</label>
+      <select id="modo">
+        <option value="mix">Mixto</option>
+        <option value="add">Suma</option>
+        <option value="sub">Resta</option>
+        <option value="mul">Multiplicación</option>
+        <option value="div">División</option>
+      </select>
+      <label for="dif">Dificultad:</label>
+      <select id="dif">
+        <option value="easy">Fácil</option>
+        <option value="mid">Media</option>
+        <option value="hard">Difícil</option>
+      </select>
+      <button id="btnStart">🚀 Comenzar</button>
+    </section>
+
+    <!-- Juego -->
+    <section class="game" id="game" style="display:none;">
+      <div id="hud">
+        <span>Puntaje: <b id="score">0</b></span> |
+        <span>Vidas: <b id="lives">3</b></span> |
+        <span>Tiempo: <b id="time">60</b> s</span>
+      </div>
+      <div id="question" style="margin-top:20px; font-size:24px;">?</div>
+      <input id="answer" type="number">
+      <button id="btnCheck">Comprobar</button>
+      <button id="btnSkip">Saltar (-1 vida)</button>
+      <button id="btnBack">Volver a configuración</button>
+      <div id="feedback" style="margin-top:10px;"></div>
+    </section>
+
+    <!-- Fin -->
+    <section class="end" id="end" style="display:none;">
+      <h2>¡Juego terminado!</h2>
+      <p>Puntaje final: <b id="finalScore">0</b></p>
+      <button id="btnReplay">Jugar de nuevo</button>
+      <button id="btnBackEnd">Volver a configuración</button>
+    </section>
+  </div>
+
+  <script>
+    const setup = document.getElementById('setup');
+    const game = document.getElementById('game');
+    const end = document.getElementById('end');
+    const question = document.getElementById('question');
+    const answer = document.getElementById('answer');
+    const scoreEl = document.getElementById('score');
+    const livesEl = document.getElementById('lives');
+    const timeEl = document.getElementById('time');
+    const feedback = document.getElementById('feedback');
+    const modoSelect = document.getElementById('modo');
+    const difSelect = document.getElementById('dif');
+
+    let score = 0;
+    let lives = 3;
+    let time = 60;
+    let timer;
+    let currentAnswer = 0;
+    let mode = 'mix';
+    let difficulty = 'mid';
+
+    const ranges = {
+      easy: [0,10],
+      mid: [5,25],
+      hard: [10,99]
+    };
+
+    const ops = {
+      add: (a,b)=>a+b,
+      sub: (a,b)=>a-b,
+      mul: (a,b)=>a*b,
+      div: (a,b)=>Math.floor(a/b)
+    };
+
+    function pickOp() {
+      if(mode === 'mix') {
+        const keys = Object.keys(ops);
+        return keys[Math.floor(Math.random()*keys.length)];
+      }
+      return mode;
+    }
+
+    function makeProblem(){
+      const [min,max] = ranges[difficulty];
+      let a = Math.floor(Math.random()*(max-min+1))+min;
+      let b = Math.floor(Math.random()*(max-min+1))+min;
+      const op = pickOp();
+      if(op==='sub' && b>a) [a,b]=[b,a];
+      if(op==='div'){
+        b = Math.max(1,b);
+        a = b * Math.floor(Math.random()*(max-min+1)+min);
+      }
+      currentAnswer = ops[op](a,b);
+      question.textContent = `${a} ${op==='add'?'+':op==='sub'?'-':op==='mul'?'×':'÷'} ${b} = ?`;
+    }
+
+    function updateHUD(){
+      scoreEl.textContent = score;
+      livesEl.textContent = lives;
+      timeEl.textContent = time;
+    }
+
+    function startGame(){
+      mode = modoSelect.value;
+      difficulty = difSelect.value;
+      score = 0;
+      lives = 3;
+      time = 60;
+      setup.style.display = 'none';
+      end.style.display = 'none';
+      game.style.display = 'block';
+      makeProblem();
+      updateHUD();
+      clearInterval(timer);
+      timer = setInterval(()=>{
+        time--;
+        updateHUD();
+        if(time<=0 || lives<=0){
+          finishGame();
+        }
+      },1000);
+    }
+
+    function checkAnswer(){
+      const val = Number(answer.value);
+      if(val===currentAnswer){
+        feedback.textContent = "✅ Correcto!";
+        score+=10;
+      } else {
+        feedback.textContent = `❌ Incorrecto! La respuesta era ${currentAnswer}`;
+        lives--;
+      }
+      answer.value='';
+      makeProblem();
+      updateHUD();
+    }
+
+    function skipAnswer(){
+      lives--;
+      makeProblem();
+      updateHUD();
+    }
+
+    function finishGame(){
+      clearInterval(timer);
+      game.style.display='none';
+      end.style.display='block';
+      document.getElementById('finalScore').textContent=score;
+    }
+
+    // Botón para volver a configuración desde el juego
+    document.getElementById('btnBack').addEventListener('click', ()=>{
+      game.style.display='none';
+      setup.style.display='block';
+      clearInterval(timer);
+      time = 60;
+      score = 0;
+      lives = 3;
+      feedback.textContent = '';
+      answer.value = '';
+      modoSelect.value = 'mix';
+      difSelect.value = 'mid';
+    });
+
+    // Botón para volver a configuración desde la pantalla final
+    document.getElementById('btnBackEnd').addEventListener('click', ()=>{
+      end.style.display='none';
+      setup.style.display='block';
+      time = 60;
+      score = 0;
+      lives = 3;
+      feedback.textContent = '';
+      answer.value = '';
+      modoSelect.value = 'mix';
+      difSelect.value = 'mid';
+    });
+
+    document.getElementById('btnStart').addEventListener('click', startGame);
+    document.getElementById('btnCheck').addEventListener('click', checkAnswer);
+    document.getElementById('btnSkip').addEventListener('click', skipAnswer);
+    document.getElementById('btnReplay').addEventListener('click', startGame);
+  </script>
+</body>
+</html>
